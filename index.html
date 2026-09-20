@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>进度智能总结系统</title>
+<style>
+  :root {
+    --primary: #2B2620;
+    --accent: #8A5A44;
+    --bg: #FAF8F5;
+    --card-bg: #FFFFFF;
+    --border: #E5E0D8;
+    --text-muted: #6B6256;
+    --danger: #B3453A;
+    --success: #4A7A5C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--primary);
+    padding: 24px 16px 60px;
+  }
+  .container { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    padding: 10px 18px;
+    background: none;
+    border: none;
+    font-size: 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--primary); font-weight: 600; border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+
+  label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+  textarea, input[type="text"], input[type="number"], select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 14px;
+    background: var(--bg);
+    color: var(--primary);
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+
+  button.primary {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--primary);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  .status-line {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 4px 0;
+  }
+  .status-line.done { color: var(--success); }
+
+  .report-box {
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.7;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+
+  .pattern-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: var(--bg);
+  }
+  .pattern-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .pattern-count {
+    display: inline-block;
+    font-size: 12px;
+    color: var(--accent);
+    background: #F3E9E2;
+    padding: 1px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+  }
+  .pattern-dates { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .suggestion-box { font-size: 13px; line-height: 1.6; }
+  .suggestion-label { color: var(--accent); font-weight: 600; }
+  .evidence { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  .empty-hint { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0; }
+  .report-pick-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    background: var(--bg);
+  }
+  .report-pick-item.checked { border-color: var(--accent); background: #F3E9E2; }
+  .report-pick-item input { margin-top: 3px; }
+  .report-pick-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
+  .report-pick-preview { font-size: 13px; }
+  .error-box {
+    color: var(--danger);
+    background: #FBEEEC;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .overall-summary {
+    font-size: 14px;
+    background: #F3E9E2;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>进度智能总结系统</h1>
+  <div class="subtitle">多Agent协作生成进度报告，并支持跨周期智能诊断</div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="summarize">生成报告</button>
+    <button class="tab-btn" data-tab="diagnose">跨周期诊断</button>
+    <button class="tab-btn" data-tab="history">历史报告</button>
+  </div>
+
+  <!-- ============ Tab 1：生成报告 ============ -->
+  <div class="tab-panel active" id="panel-summarize">
+    <div class="card">
+      <h2>输入本期记录</h2>
+      <label>把这段时间零散的进度记录粘贴在这里</label>
+      <textarea id="rawNotes" placeholder="例如：周一完成了登录模块开发；周三调试接口卡了两天；周五写完了单元测试..."></textarea>
+      <div class="row">
+        <div>
+          <label>报告周期</label>
+          <select id="period">
+            <option value="本周">本周</option>
+            <option value="今日">今日</option>
+            <option value="本月">本月</option>
+          </select>
+        </div>
+        <div>
+          <label>作者姓名（可选）</label>
+          <input type="text" id="authorName" placeholder="不填则显示为“个人”">
+        </div>
+      </div>
+      <button class="primary" id="btnSummarize">生成报告</button>
+    </div>
+
+    <div class="card" id="summarizeProgress" style="display:none;">
+      <h2>Agent 运行过程</h2>
+      <div class="status-line" id="statusCollector">等待中：CollectorAgent（采集整理）</div>
+      <div class="status-line" id="statusAnalyzer">等待中：AnalyzerAgent（深度分析）</div>
+      <div class="status-line" id="statusFormatter">等待中：FormatterAgent（生成报告）</div>
+    </div>
+
+    <div class="card" id="summarizeResult" style="display:none;">
+      <h2>生成结果</h2>
+      <div class="report-box" id="reportBox"></div>
+      <button class="secondary" id="btnExportWord">导出为 Word 文档</button>
+    </div>
+
+    <div id="summarizeError"></div>
+  </div>
+
+  <!-- ============ Tab 2：跨周期诊断 ============ -->
+  <div class="tab-panel" id="panel-diagnose">
+    <div class="card">
+      <h2>选择要分析的报告</h2>
+      <label>勾选至少2条历史报告，AI会对比这些报告找出反复出现的问题</label>
+      <div id="reportPicker" class="empty-hint">加载中...</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="secondary" id="btnSelectAll" type="button">全选</button>
+        <button class="secondary" id="btnSelectNone" type="button">清空选择</button>
+      </div>
+      <div class="status-line" id="selectedCountHint" style="margin-top:6px;">已选择 0 条</div>
+      <button class="primary" id="btnDiagnose" style="margin-top:10px;" disabled>生成诊断</button>
+      <div class="status-line" id="diagnoseStatus" style="margin-top:10px; display:none;">诊断进行中：正在识别重复问题模式...</div>
+    </div>
+
+    <div class="card" id="diagnoseResult" style="display:none;">
+      <h2>诊断结果</h2>
+      <div class="overall-summary" id="overallSummary"></div>
+      <div id="patternsContainer"></div>
+    </div>
+
+    <div id="diagnoseError"></div>
+  </div>
+
+  <!-- ============ Tab 3：历史报告 ============ -->
+  <div class="tab-panel" id="panel-history">
+    <div class="card">
+      <h2>历史报告列表</h2>
+      <div id="historyList" class="empty-hint">加载中...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = {
+  summarize: '/api/summarize',
+  diagnose: '/api/diagnose',
+  reports: '/api/reports',
+  exportWord: '/api/export/word'
+};
+
+let lastReportId = null;
+
+// ---------- Tab 切换 ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'history') loadHistory();
+    if (btn.dataset.tab === 'diagnose') loadReportPicker();
+  });
+});
+
+// ---------- 生成报告 ----------
+document.getElementById('btnSummarize').addEventListener('click', async () => {
+  const rawNotes = document.getElementById('rawNotes').value.trim();
+  const period = document.getElementById('period').value;
+  const authorName = document.getElementById('authorName').value.trim();
+  const errorBox = document.getElementById('summarizeError');
+  errorBox.innerHTML = '';
+
+  if (!rawNotes) {
+    errorBox.innerHTML = '<div class="error-box">请先输入本期的记录内容</div>';
+    return;
+  }
+
+  document.getElementById('summarizeProgress').style.display = 'block';
+  document.getElementById('summarizeResult').style.display = 'none';
+  ['statusCollector', 'statusAnalyzer', 'statusFormatter'].forEach(id => {
+    document.getElementById(id).classList.remove('done');
+  });
+  const btn = document.getElementById('btnSummarize');
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+
+  // 简单模拟分阶段提示（真实调用是一次性返回，这里按顺序点亮状态，便于演示三个Agent的流程）
+  setTimeout(() => markDone('statusCollector', '已完成：CollectorAgent 已整理原始记录'), 300);
+  setTimeout(() => markDone('statusAnalyzer', '已完成：AnalyzerAgent 已完成深度分析'), 900);
+
+  try {
+    const resp = await fetch(API.summarize, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw_notes: rawNotes, period, author_name: authorName })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || '生成失败');
+
+    markDone('statusFormatter', '已完成：FormatterAgent 已生成最终报告');
+
+    document.getElementById('reportBox').textContent = data.final_report;
+    document.getElementById('summarizeResult').style.display = 'block';
+    lastReportId = data.report_id;
+  } catch (e) {
+    errorBox.innerHTML = `<div class="error-box">生成失败：${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '生成报告';
+  }
+});
+
+function markDone(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.classList.add('done');
+}
+
+document.getElementById('btnExportWord').addEventListener('click', async () => {
+  if (!lastReportId) return;
+  const resp = await fetch(API.exportWord, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report_id: lastReportId })
+  });
+  if (!resp.ok) {
+    alert('导出失败，请重试');
+    return;
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `report_${lastReportId}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ---------- 跨周期诊断：报告选择器 ----------
+let selectedReportIds = new Set();
+let allPickableReports = [];
+
+async function loadReportPicker() {
+  const pickerEl = document.getElementById('reportPicker');
+  pickerEl.innerHTML = '加载中...';
+  try {
+    const resp = await fetch(`${API.reports}?page=1&page_size=50`);
+    const data = await resp.json();
+    allPickableReports = data.reports || [];
+
+    if (allPickableReports.length === 0) {
+      pickerEl.innerHTML = '<div class="empty-hint">还没有历史报告，先去“生成报告”标签页生成几份吧</div>';
+      return;
+    }
+
+    pickerEl.innerHTML = '';
+    allPickableReports.forEach(r => {
+      const item = document.createElement('label');
+      item.className = 'report-pick-item';
+      item.dataset.id = r.report_id;
+      const dateStr = (r.created_at || '').replace('T', ' ').slice(0, 16);
+      item.innerHTML = `
+        <input type="checkbox" value="${r.report_id}">
+        <div>
+          <div class="report-pick-meta">${r.period} · ${r.author_name || '个人'} · ${dateStr}</div>
+          <div class="report-pick-preview">${r.preview}</div>
+        </div>
+      `;
+      const checkbox = item.querySelector('input');
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selectedReportIds.add(r.report_id);
+          item.classList.add('checked');
+        } else {
+          selectedReportIds.delete(r.report_id);
+          item.classList.remove('checked');
+        }
+        updateSelectedCount();
+      });
+      pickerEl.appendChild(item);
+    });
+    updateSelectedCount();
+  } catch (e) {
+    pickerEl.innerHTML = `<div class="error-box">加载失败：${e.message}</div>`;
+  }
+}
+
+function updateSelectedCount() {
+  document.getElementById('selectedCountHint').textContent = `已选择 ${selectedReportIds.size} 条`;
+  document.getElementById('btnDiagnose').disabled = selectedReportIds.size < 2;
+}
+
+document.getElementById('btnSelectAll').addEventListener('click', () => {
+  selectedReportIds = new Set(allPickableReports.map(r => r.report_id));
+  document.querySelectorAll('.report-pick-item').forEach(item => {
+    item.classList.add('checked');
+    item.querySelector('input').checked = true;
+  });
+  updateSelectedCount();
+});
+
+document.getElementById('btnSelectNone').addEventListener('click', () => {
+  selectedReportIds.clear();
+  document.querySelectorAll('.report-pick-item').forEach(item => {
+    item.classList.remove('checked');
+    item.querySelector('input').checked = false;
+  });
+  updateSelectedCount();
+});
+
+// ---------- 跨周期诊断：生成 ----------
+document.getElementById('btnDiagnose').addEventListener('click', async () => {
+  if (selectedReportIds.size < 2) return;
+
+  const errorBox = document.getElementById('diagnoseError');
+  const statusEl = document.getElementById('diagnoseStatus');
+  const resultCard = document.getElementById('diagnoseResult');
+  errorBox.innerHTML = '';
+  resultCard.style.display = 'none';
+  statusEl.style.display = 'block';
+
+  const btn = document.getElementById('btnDiagnose');
+  btn.disabled = true;
+  btn.textContent = '诊断中...';
+
+  try {
+    const resp = await fetch(API.diagnose, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report_ids: Array.from(selectedReportIds) })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || '诊断失败');
+
+    renderDiagnosis(data);
+    resultCard.style.display = 'block';
+  } catch (e) {
+    errorBox.innerHTML = `<div class="error-box">诊断失败：${e.message}</div>`;
+  } finally {
+    statusEl.style.display = 'none';
+    btn.disabled = selectedReportIds.size < 2;
+    btn.textContent = '生成诊断';
+  }
+});
+
+function renderDiagnosis(data) {
+  document.getElementById('overallSummary').textContent =
+    `共分析 ${data.analyzed_report_count} 条历史报告：${data.overall_summary}`;
+
+  const container = document.getElementById('patternsContainer');
+  container.innerHTML = '';
+
+  if (!data.patterns || data.patterns.length === 0) {
+    container.innerHTML = '<div class="empty-hint">未发现明显的重复问题，近期状态较为稳定</div>';
+    return;
+  }
+
+  data.patterns.forEach(pattern => {
+    const suggestion = (data.suggestions || []).find(s => s.related_issue === pattern.issue);
+
+    const card = document.createElement('div');
+    card.className = 'pattern-card';
+
+    const dates = (pattern.related_dates || []).join('、');
+
+    card.innerHTML = `
+      <div class="pattern-title">${pattern.issue}<span class="pattern-count">出现 ${pattern.occurrence_count} 次</span></div>
+      <div class="pattern-dates">涉及日期：${dates || '未知'}</div>
+      ${suggestion ? `
+        <div class="suggestion-box">
+          <span class="suggestion-label">改进建议：</span>${suggestion.suggestion}
+          <div class="evidence">依据：${suggestion.evidence}</div>
+        </div>
+      ` : ''}
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ---------- 历史报告列表 ----------
+async function loadHistory() {
+  const listEl = document.getElementById('historyList');
+  listEl.innerHTML = '加载中...';
+  try {
+    const resp = await fetch(`${API.reports}?page=1&page_size=20`);
+    const data = await resp.json();
+    if (!data.reports || data.reports.length === 0) {
+      listEl.innerHTML = '<div class="empty-hint">还没有历史报告，先去生成一份吧</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    data.reports.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'pattern-card';
+      item.innerHTML = `
+        <div class="pattern-title">${r.period} · ${r.author_name || '个人'}</div>
+        <div class="pattern-dates">${(r.created_at || '').replace('T', ' ').slice(0, 16)}</div>
+        <div class="suggestion-box">${r.preview}</div>
+      `;
+      listEl.appendChild(item);
+    });
+  } catch (e) {
+    listEl.innerHTML = `<div class="error-box">加载失败：${e.message}</div>`;
+  }
+}
+</script>
+</body>
+</html>
